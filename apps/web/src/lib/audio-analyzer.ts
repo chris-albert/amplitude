@@ -9,6 +9,11 @@ export interface AudioMetrics {
   duration: number
   sampleRate: number
   channels: number
+  // Time positions for markers (normalized 0-1)
+  minLUFSPosition: number
+  maxLUFSPosition: number
+  peakDBPosition: number
+  minDBPosition: number
 }
 
 export interface AnalysisProgress {
@@ -188,8 +193,11 @@ export async function calculateDBMetrics(buffer: AudioBuffer): Promise<{
   averageDB: number
   minDB: number
   standardDeviation: number
+  peakDBPosition: number
+  minDBPosition: number
 }> {
   let maxSample = 0
+  let maxSampleIndex = 0
   let sumSquares = 0
   let count = 0
 
@@ -198,7 +206,10 @@ export async function calculateDBMetrics(buffer: AudioBuffer): Promise<{
     const data = buffer.getChannelData(ch)
     for (let i = 0; i < data.length; i++) {
       const absValue = Math.abs(data[i])
-      if (absValue > maxSample) maxSample = absValue
+      if (absValue > maxSample) {
+        maxSample = absValue
+        maxSampleIndex = i
+      }
       sumSquares += absValue * absValue
       count++
       // Yield every 1M samples to keep UI responsive
@@ -210,6 +221,7 @@ export async function calculateDBMetrics(buffer: AudioBuffer): Promise<{
 
   // Peak dB
   const peakDB = maxSample > 0 ? 20 * Math.log10(maxSample) : -Infinity
+  const peakDBPosition = buffer.length > 0 ? maxSampleIndex / buffer.length : 0
 
   // RMS for average dB
   const rms = Math.sqrt(sumSquares / count)
@@ -217,28 +229,28 @@ export async function calculateDBMetrics(buffer: AudioBuffer): Promise<{
 
   // For min dB and standard deviation, use sampling to avoid memory issues
   // Sample every Nth value to get a representative subset
-  const sampleRate = Math.max(1, Math.floor(count / 100000)) // Max 100k samples
-  const sampledDB: number[] = []
+  const sampleRateDiv = Math.max(1, Math.floor(count / 100000)) // Max 100k samples
+  const sampledDB: { db: number, index: number }[] = []
 
   for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
     const data = buffer.getChannelData(ch)
-    for (let i = 0; i < data.length; i += sampleRate) {
+    for (let i = 0; i < data.length; i += sampleRateDiv) {
       const absValue = Math.abs(data[i])
       if (absValue > 0.0001) {
-        sampledDB.push(20 * Math.log10(absValue))
+        sampledDB.push({ db: 20 * Math.log10(absValue), index: i })
       }
     }
   }
 
   // Sort sampled values to find quietest 10%
-  sampledDB.sort((a, b) => a - b)
+  sampledDB.sort((a, b) => a.db - b.db)
   const quietestCount = Math.floor(sampledDB.length * 0.1)
   const quietestSamples = sampledDB.slice(0, quietestCount)
 
   // Min dB from quietest samples (convert back from dB to calculate RMS properly)
   let quietestSumSquares = 0
-  for (const db of quietestSamples) {
-    const linear = Math.pow(10, db / 20)
+  for (const sample of quietestSamples) {
+    const linear = Math.pow(10, sample.db / 20)
     quietestSumSquares += linear * linear
   }
   const quietestRMS = quietestSamples.length > 0
@@ -246,12 +258,18 @@ export async function calculateDBMetrics(buffer: AudioBuffer): Promise<{
     : 0
   const minDB = quietestRMS > 0 ? 20 * Math.log10(quietestRMS) : -Infinity
 
+  // Find the position of the quietest sample (middle of quietest region)
+  const minDBPosition = quietestSamples.length > 0
+    ? quietestSamples[Math.floor(quietestSamples.length / 2)].index / buffer.length
+    : 0
+
   // Standard deviation of dB values
-  const meanDB = sampledDB.reduce((a, b) => a + b, 0) / sampledDB.length
-  const variance = sampledDB.reduce((sum, val) => sum + Math.pow(val - meanDB, 2), 0) / sampledDB.length
+  const dbValues = sampledDB.map(s => s.db)
+  const meanDB = dbValues.reduce((a, b) => a + b, 0) / dbValues.length
+  const variance = dbValues.reduce((sum, val) => sum + Math.pow(val - meanDB, 2), 0) / dbValues.length
   const standardDeviation = Math.sqrt(variance)
 
-  return { peakDB, averageDB, minDB, standardDeviation }
+  return { peakDB, averageDB, minDB, standardDeviation, peakDBPosition, minDBPosition }
 }
 
 // Main analysis function
@@ -286,6 +304,30 @@ export async function analyzeAudio(
   onProgress?.({ stage: 'analyzing', progress: 100 })
   onProgress?.({ stage: 'complete', progress: 100 })
 
+  // Calculate min/max LUFS positions (normalized 0-1)
+  let minLUFSIndex = 0
+  let maxLUFSIndex = 0
+  let minLUFS = Infinity
+  let maxLUFS = -Infinity
+
+  for (let i = 0; i < shortTerm.values.length; i++) {
+    if (shortTerm.values[i] < minLUFS) {
+      minLUFS = shortTerm.values[i]
+      minLUFSIndex = i
+    }
+    if (shortTerm.values[i] > maxLUFS) {
+      maxLUFS = shortTerm.values[i]
+      maxLUFSIndex = i
+    }
+  }
+
+  const minLUFSPosition = shortTerm.times.length > 0
+    ? shortTerm.times[minLUFSIndex] / buffer.duration
+    : 0
+  const maxLUFSPosition = shortTerm.times.length > 0
+    ? shortTerm.times[maxLUFSIndex] / buffer.duration
+    : 0
+
   return {
     integratedLUFS,
     shortTermLUFS: shortTerm.values,
@@ -297,6 +339,10 @@ export async function analyzeAudio(
     duration: buffer.duration,
     sampleRate: buffer.sampleRate,
     channels: buffer.numberOfChannels,
+    minLUFSPosition,
+    maxLUFSPosition,
+    peakDBPosition: dbMetrics.peakDBPosition,
+    minDBPosition: dbMetrics.minDBPosition,
   }
 }
 
