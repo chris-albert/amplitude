@@ -1,5 +1,11 @@
 import { useEffect, useRef, useCallback } from 'react'
 
+export interface Marker {
+  position: number // normalized 0-1
+  color: string
+  label: string
+}
+
 interface WaveformDisplayProps {
   waveformData: number[]
   className?: string
@@ -8,6 +14,7 @@ interface WaveformDisplayProps {
   onStop?: () => void
   playbackPosition?: number
   isPlaying?: boolean
+  markers?: Marker[]
 }
 
 // Fixed width to match Chart.js Y-axis
@@ -20,7 +27,8 @@ export function WaveformDisplay({
   onPlay,
   onStop,
   playbackPosition = 0,
-  isPlaying = false
+  isPlaying = false,
+  markers = []
 }: WaveformDisplayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -79,7 +87,20 @@ export function WaveformDisplay({
     ctx.lineTo(width, centerY)
     ctx.stroke()
 
-    // Draw playhead if playing
+    // Draw markers
+    markers.forEach(marker => {
+      const markerX = marker.position * width
+      ctx.strokeStyle = marker.color
+      ctx.lineWidth = 2
+      ctx.setLineDash([4, 4])
+      ctx.beginPath()
+      ctx.moveTo(markerX, 0)
+      ctx.lineTo(markerX, height)
+      ctx.stroke()
+      ctx.setLineDash([])
+    })
+
+    // Draw playhead if playing (on top of markers)
     if (playbackPosition > 0 || isPlaying) {
       const playheadX = playbackPosition * width
       ctx.strokeStyle = 'rgba(251, 191, 36, 0.9)'
@@ -89,7 +110,7 @@ export function WaveformDisplay({
       ctx.lineTo(playheadX, height)
       ctx.stroke()
     }
-  }, [waveformData, playbackPosition, isPlaying])
+  }, [waveformData, playbackPosition, isPlaying, markers])
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!onSeek || !containerRef.current) return
@@ -134,6 +155,19 @@ export function WaveformDisplay({
           style={{ display: 'block' }}
         />
       </div>
+      {markers.length > 0 && (
+        <div className="flex flex-wrap gap-4 mt-3 text-xs" style={{ marginLeft: `${Y_AXIS_WIDTH}px` }}>
+          {markers.map((marker, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <div
+                className="w-3 h-0.5"
+                style={{ backgroundColor: marker.color, borderStyle: 'dashed' }}
+              />
+              <span className="text-gray-400">{marker.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

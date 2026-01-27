@@ -23,6 +23,12 @@ ChartJS.register(
   Filler
 )
 
+export interface Marker {
+  position: number // normalized 0-1
+  color: string
+  label: string
+}
+
 interface LoudnessChartProps {
   values: number[]
   times: number[]
@@ -33,6 +39,7 @@ interface LoudnessChartProps {
   onStop?: () => void
   playbackPosition?: number
   isPlaying?: boolean
+  markers?: Marker[]
 }
 
 // Fixed width to match waveform alignment
@@ -47,7 +54,8 @@ export function LoudnessChart({
   onPlay,
   onStop,
   playbackPosition = 0,
-  isPlaying = false
+  isPlaying = false,
+  markers = []
 }: LoudnessChartProps) {
   const chartRef = useRef<ChartJS<'line'>>(null)
 
@@ -175,13 +183,29 @@ export function LoudnessChart({
 
   // Calculate playhead position as percentage of chart area
   const getPlayheadStyle = () => {
-    if (!chartRef.current || (playbackPosition === 0 && !isPlaying)) return { display: 'none' }
+    if (!chartRef.current || (playbackPosition === 0 && !isPlaying)) return { display: 'none' as const }
 
     const chart = chartRef.current
     const chartArea = chart.chartArea
-    if (!chartArea) return { display: 'none' }
+    if (!chartArea) return { display: 'none' as const }
 
     const left = chartArea.left + playbackPosition * (chartArea.right - chartArea.left)
+    return {
+      left: `${left}px`,
+      top: `${chartArea.top}px`,
+      height: `${chartArea.bottom - chartArea.top}px`,
+    }
+  }
+
+  // Calculate marker position style
+  const getMarkerStyle = (position: number) => {
+    if (!chartRef.current) return { display: 'none' as const }
+
+    const chart = chartRef.current
+    const chartArea = chart.chartArea
+    if (!chartArea) return { display: 'none' as const }
+
+    const left = chartArea.left + position * (chartArea.right - chartArea.left)
     return {
       left: `${left}px`,
       top: `${chartArea.top}px`,
@@ -216,6 +240,18 @@ export function LoudnessChart({
         onClick={handleChartClick}
       >
         <Line ref={chartRef} data={data} options={options} />
+        {/* Markers */}
+        {markers.map((marker, i) => (
+          <div
+            key={i}
+            className="absolute w-0.5 pointer-events-none"
+            style={{
+              ...getMarkerStyle(marker.position),
+              backgroundImage: `repeating-linear-gradient(to bottom, ${marker.color} 0px, ${marker.color} 4px, transparent 4px, transparent 8px)`,
+            }}
+          />
+        ))}
+        {/* Playhead on top */}
         {(playbackPosition > 0 || isPlaying) && (
           <div
             className="absolute w-0.5 bg-amber-400 pointer-events-none"
@@ -223,6 +259,19 @@ export function LoudnessChart({
           />
         )}
       </div>
+      {markers.length > 0 && (
+        <div className="flex flex-wrap gap-4 mt-3 text-xs" style={{ marginLeft: `${Y_AXIS_WIDTH}px` }}>
+          {markers.map((marker, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <div
+                className="w-3 h-0.5"
+                style={{ backgroundColor: marker.color }}
+              />
+              <span className="text-gray-400">{marker.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useMemo } from 'react'
 import { FileUploader } from './components/FileUploader'
-import { WaveformDisplay } from './components/WaveformDisplay'
+import { WaveformDisplay, type Marker } from './components/WaveformDisplay'
 import { LoudnessChart } from './components/LoudnessChart'
 import { MetricsDisplay } from './components/MetricsDisplay'
 import { analyzeAudio, loadAudioFile, getWaveformData, type AudioMetrics, type AnalysisProgress } from './lib/audio-analyzer'
@@ -99,6 +99,17 @@ function App() {
   const handlePlay = useCallback(() => {
     playFromPosition(0)
   }, [playFromPosition])
+
+  // Create markers for min/max LUFS and dB positions
+  const markers: Marker[] = useMemo(() => {
+    if (!metrics) return []
+    return [
+      { position: metrics.maxLUFSPosition, color: '#22c55e', label: 'Max LUFS' },
+      { position: metrics.minLUFSPosition, color: '#ef4444', label: 'Min LUFS' },
+      { position: metrics.peakDBPosition, color: '#3b82f6', label: 'Peak dB' },
+      { position: metrics.minDBPosition, color: '#f97316', label: 'Min dB' },
+    ]
+  }, [metrics])
 
   const handleFileSelect = useCallback(async (file: File) => {
     stopPlayback()
@@ -307,6 +318,7 @@ function App() {
                   onStop={stopPlayback}
                   playbackPosition={audioBuffer ? playbackPosition / audioBuffer.duration : 0}
                   isPlaying={isPlaying}
+                  markers={markers}
                 />
               )}
 
@@ -320,6 +332,7 @@ function App() {
                   onStop={stopPlayback}
                   playbackPosition={audioBuffer ? playbackPosition / audioBuffer.duration : 0}
                   isPlaying={isPlaying}
+                  markers={markers}
                 />
               )}
             </div>
