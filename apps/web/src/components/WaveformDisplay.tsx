@@ -1,12 +1,22 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 
 interface WaveformDisplayProps {
   waveformData: number[]
   className?: string
+  onSeek?: (normalizedPosition: number) => void
+  playbackPosition?: number
+  isPlaying?: boolean
 }
 
-export function WaveformDisplay({ waveformData, className = '' }: WaveformDisplayProps) {
+export function WaveformDisplay({
+  waveformData,
+  className = '',
+  onSeek,
+  playbackPosition = 0,
+  isPlaying = false
+}: WaveformDisplayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -61,16 +71,42 @@ export function WaveformDisplay({ waveformData, className = '' }: WaveformDispla
     ctx.moveTo(0, centerY)
     ctx.lineTo(width, centerY)
     ctx.stroke()
-  }, [waveformData])
+
+    // Draw playhead if playing
+    if (playbackPosition > 0 || isPlaying) {
+      const playheadX = playbackPosition * width
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.9)'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(playheadX, 0)
+      ctx.lineTo(playheadX, height)
+      ctx.stroke()
+    }
+  }, [waveformData, playbackPosition, isPlaying])
+
+  const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!onSeek || !containerRef.current) return
+
+    const rect = containerRef.current.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const normalizedPosition = Math.max(0, Math.min(1, x / rect.width))
+    onSeek(normalizedPosition)
+  }, [onSeek])
 
   return (
     <div className={`card ${className}`}>
       <h3 className="text-sm font-medium text-gray-400 mb-4">Waveform</h3>
-      <canvas
-        ref={canvasRef}
-        className="w-full h-32 rounded-lg bg-gray-800/50"
-        style={{ display: 'block' }}
-      />
+      <div
+        ref={containerRef}
+        onClick={handleClick}
+        className={`relative ${onSeek ? 'cursor-pointer' : ''}`}
+      >
+        <canvas
+          ref={canvasRef}
+          className="w-full h-32 rounded-lg bg-gray-800/50"
+          style={{ display: 'block' }}
+        />
+      </div>
     </div>
   )
 }
