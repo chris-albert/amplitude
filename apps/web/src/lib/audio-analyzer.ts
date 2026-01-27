@@ -18,6 +18,11 @@ export interface AnalysisProgress {
 
 type ProgressCallback = (progress: AnalysisProgress) => void
 
+// Helper to yield to main thread and prevent "page unresponsive"
+function yieldToMain(): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, 0))
+}
+
 export async function loadAudioFile(file: File): Promise<AudioBuffer> {
   const arrayBuffer = await file.arrayBuffer()
   const audioContext = new AudioContext()
@@ -81,12 +86,13 @@ function meanSquareToLUFS(meanSquare: number): number {
 }
 
 // Calculate integrated LUFS (ITU-R BS.1770)
-export function calculateIntegratedLUFS(filteredChannels: Float32Array[], sampleRate: number): number {
+export async function calculateIntegratedLUFS(filteredChannels: Float32Array[], sampleRate: number): Promise<number> {
   const blockSize = Math.floor(0.4 * sampleRate) // 400ms blocks
   const hopSize = Math.floor(0.1 * sampleRate) // 75% overlap
   const length = filteredChannels[0].length
 
   const blockLoudnesses: number[] = []
+  let iterCount = 0
 
   for (let start = 0; start + blockSize <= length; start += hopSize) {
     let sumMeanSquare = 0
@@ -100,6 +106,11 @@ export function calculateIntegratedLUFS(filteredChannels: Float32Array[], sample
     const blockLoudness = meanSquareToLUFS(sumMeanSquare)
     if (isFinite(blockLoudness)) {
       blockLoudnesses.push(blockLoudness)
+    }
+
+    // Yield every 1000 iterations to keep UI responsive
+    if (++iterCount % 1000 === 0) {
+      await yieldToMain()
     }
   }
 
@@ -137,16 +148,17 @@ function getChannelWeight(channel: number, totalChannels: number): number {
 }
 
 // Calculate short-term LUFS (3-second window)
-export function calculateShortTermLUFS(
+export async function calculateShortTermLUFS(
   filteredChannels: Float32Array[],
   sampleRate: number
-): { values: number[], times: number[] } {
+): Promise<{ values: number[], times: number[] }> {
   const windowSize = Math.floor(3 * sampleRate) // 3 seconds
   const hopSize = Math.floor(0.1 * sampleRate) // 100ms hop
   const length = filteredChannels[0].length
 
   const values: number[] = []
   const times: number[] = []
+  let iterCount = 0
 
   for (let start = 0; start + windowSize <= length; start += hopSize) {
     let sumMeanSquare = 0
@@ -160,27 +172,39 @@ export function calculateShortTermLUFS(
     const loudness = meanSquareToLUFS(sumMeanSquare)
     values.push(isFinite(loudness) ? loudness : -70)
     times.push((start + windowSize / 2) / sampleRate)
+
+    // Yield every 500 iterations to keep UI responsive
+    if (++iterCount % 500 === 0) {
+      await yieldToMain()
+    }
   }
 
   return { values, times }
 }
 
-// Calculate dB metrics from raw audio buffer
-export function calculateDBMetrics(buffer: AudioBuffer): {
+// Calculate dB metrics from raw audio buffer (memory-efficient streaming approach)
+export async function calculateDBMetrics(buffer: AudioBuffer): Promise<{
   peakDB: number
   averageDB: number
   minDB: number
   standardDeviation: number
-} {
-  const allSamples: number[] = []
+}> {
   let maxSample = 0
+  let sumSquares = 0
+  let count = 0
 
+  // First pass: calculate peak and RMS (streaming, no large arrays)
   for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
     const data = buffer.getChannelData(ch)
     for (let i = 0; i < data.length; i++) {
       const absValue = Math.abs(data[i])
-      allSamples.push(absValue)
       if (absValue > maxSample) maxSample = absValue
+      sumSquares += absValue * absValue
+      count++
+      // Yield every 1M samples to keep UI responsive
+      if (count % 1000000 === 0) {
+        await yieldToMain()
+      }
     }
   }
 
@@ -188,25 +212,43 @@ export function calculateDBMetrics(buffer: AudioBuffer): {
   const peakDB = maxSample > 0 ? 20 * Math.log10(maxSample) : -Infinity
 
   // RMS for average dB
-  const sumSquares = allSamples.reduce((sum, val) => sum + val * val, 0)
-  const rms = Math.sqrt(sumSquares / allSamples.length)
+  const rms = Math.sqrt(sumSquares / count)
   const averageDB = rms > 0 ? 20 * Math.log10(rms) : -Infinity
 
-  // Min dB (using RMS of quietest 10% of non-silent samples)
-  const nonSilent = allSamples.filter(v => v > 0.0001).sort((a, b) => a - b)
-  const quietest = nonSilent.slice(0, Math.floor(nonSilent.length * 0.1))
-  const quietestRMS = quietest.length > 0
-    ? Math.sqrt(quietest.reduce((sum, val) => sum + val * val, 0) / quietest.length)
+  // For min dB and standard deviation, use sampling to avoid memory issues
+  // Sample every Nth value to get a representative subset
+  const sampleRate = Math.max(1, Math.floor(count / 100000)) // Max 100k samples
+  const sampledDB: number[] = []
+
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const data = buffer.getChannelData(ch)
+    for (let i = 0; i < data.length; i += sampleRate) {
+      const absValue = Math.abs(data[i])
+      if (absValue > 0.0001) {
+        sampledDB.push(20 * Math.log10(absValue))
+      }
+    }
+  }
+
+  // Sort sampled values to find quietest 10%
+  sampledDB.sort((a, b) => a - b)
+  const quietestCount = Math.floor(sampledDB.length * 0.1)
+  const quietestSamples = sampledDB.slice(0, quietestCount)
+
+  // Min dB from quietest samples (convert back from dB to calculate RMS properly)
+  let quietestSumSquares = 0
+  for (const db of quietestSamples) {
+    const linear = Math.pow(10, db / 20)
+    quietestSumSquares += linear * linear
+  }
+  const quietestRMS = quietestSamples.length > 0
+    ? Math.sqrt(quietestSumSquares / quietestSamples.length)
     : 0
   const minDB = quietestRMS > 0 ? 20 * Math.log10(quietestRMS) : -Infinity
 
   // Standard deviation of dB values
-  const dbValues = allSamples
-    .filter(v => v > 0.0001)
-    .map(v => 20 * Math.log10(v))
-
-  const meanDB = dbValues.reduce((a, b) => a + b, 0) / dbValues.length
-  const variance = dbValues.reduce((sum, val) => sum + Math.pow(val - meanDB, 2), 0) / dbValues.length
+  const meanDB = sampledDB.reduce((a, b) => a + b, 0) / sampledDB.length
+  const variance = sampledDB.reduce((sum, val) => sum + Math.pow(val - meanDB, 2), 0) / sampledDB.length
   const standardDeviation = Math.sqrt(variance)
 
   return { peakDB, averageDB, minDB, standardDeviation }
@@ -229,17 +271,17 @@ export async function analyzeAudio(
   onProgress?.({ stage: 'analyzing', progress: 70 })
 
   // Calculate integrated LUFS
-  const integratedLUFS = calculateIntegratedLUFS(filteredChannels, buffer.sampleRate)
+  const integratedLUFS = await calculateIntegratedLUFS(filteredChannels, buffer.sampleRate)
 
   onProgress?.({ stage: 'analyzing', progress: 80 })
 
   // Calculate short-term LUFS
-  const shortTerm = calculateShortTermLUFS(filteredChannels, buffer.sampleRate)
+  const shortTerm = await calculateShortTermLUFS(filteredChannels, buffer.sampleRate)
 
   onProgress?.({ stage: 'analyzing', progress: 90 })
 
   // Calculate dB metrics
-  const dbMetrics = calculateDBMetrics(buffer)
+  const dbMetrics = await calculateDBMetrics(buffer)
 
   onProgress?.({ stage: 'analyzing', progress: 100 })
   onProgress?.({ stage: 'complete', progress: 100 })
