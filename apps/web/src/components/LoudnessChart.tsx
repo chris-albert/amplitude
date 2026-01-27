@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useCallback } from 'react'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -28,10 +28,21 @@ interface LoudnessChartProps {
   times: number[]
   integratedLUFS: number
   className?: string
+  onSeek?: (normalizedPosition: number) => void
+  playbackPosition?: number
+  isPlaying?: boolean
 }
 
-export function LoudnessChart({ values, times, integratedLUFS, className = '' }: LoudnessChartProps) {
-  const chartRef = useRef(null)
+export function LoudnessChart({
+  values,
+  times,
+  integratedLUFS,
+  className = '',
+  onSeek,
+  playbackPosition = 0,
+  isPlaying = false
+}: LoudnessChartProps) {
+  const chartRef = useRef<ChartJS<'line'>>(null)
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -76,6 +87,23 @@ export function LoudnessChart({ values, times, integratedLUFS, className = '' }:
       },
     ],
   }
+
+  const handleChartClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (!onSeek || !chartRef.current) return
+
+    const chart = chartRef.current
+    const chartArea = chart.chartArea
+    if (!chartArea) return
+
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = event.clientX - rect.left
+
+    // Check if click is within chart area
+    if (x < chartArea.left || x > chartArea.right) return
+
+    const normalizedPosition = (x - chartArea.left) / (chartArea.right - chartArea.left)
+    onSeek(Math.max(0, Math.min(1, normalizedPosition)))
+  }, [onSeek])
 
   const options = {
     responsive: true,
@@ -135,11 +163,36 @@ export function LoudnessChart({ values, times, integratedLUFS, className = '' }:
     },
   }
 
+  // Calculate playhead position as percentage of chart area
+  const getPlayheadStyle = () => {
+    if (!chartRef.current || (playbackPosition === 0 && !isPlaying)) return { display: 'none' }
+
+    const chart = chartRef.current
+    const chartArea = chart.chartArea
+    if (!chartArea) return { display: 'none' }
+
+    const left = chartArea.left + playbackPosition * (chartArea.right - chartArea.left)
+    return {
+      left: `${left}px`,
+      top: `${chartArea.top}px`,
+      height: `${chartArea.bottom - chartArea.top}px`,
+    }
+  }
+
   return (
     <div className={`card ${className}`}>
       <h3 className="text-sm font-medium text-gray-400 mb-4">Loudness Over Time</h3>
-      <div className="h-64">
+      <div
+        className={`h-64 relative ${onSeek ? 'cursor-pointer' : ''}`}
+        onClick={handleChartClick}
+      >
         <Line ref={chartRef} data={data} options={options} />
+        {(playbackPosition > 0 || isPlaying) && (
+          <div
+            className="absolute w-0.5 bg-amber-400 pointer-events-none"
+            style={getPlayheadStyle()}
+          />
+        )}
       </div>
     </div>
   )

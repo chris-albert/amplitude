@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { FileUploader } from './components/FileUploader'
 import { WaveformDisplay } from './components/WaveformDisplay'
 import { LoudnessChart } from './components/LoudnessChart'
@@ -12,12 +12,98 @@ function App() {
   const [waveformData, setWaveformData] = useState<number[]>([])
   const [fileName, setFileName] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
+  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [playbackPosition, setPlaybackPosition] = useState(0)
+
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null)
+  const startTimeRef = useRef<number>(0)
+  const startOffsetRef = useRef<number>(0)
+  const animationFrameRef = useRef<number | null>(null)
+
+  const stopPlayback = useCallback(() => {
+    if (sourceNodeRef.current) {
+      sourceNodeRef.current.stop()
+      sourceNodeRef.current.disconnect()
+      sourceNodeRef.current = null
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
+    setIsPlaying(false)
+  }, [])
+
+  const updatePlaybackPosition = useCallback(() => {
+    if (!audioContextRef.current || !audioBuffer) return
+
+    const elapsed = audioContextRef.current.currentTime - startTimeRef.current
+    const position = startOffsetRef.current + elapsed
+
+    if (position >= audioBuffer.duration) {
+      stopPlayback()
+      setPlaybackPosition(0)
+      return
+    }
+
+    setPlaybackPosition(position)
+    animationFrameRef.current = requestAnimationFrame(updatePlaybackPosition)
+  }, [audioBuffer, stopPlayback])
+
+  const playFromPosition = useCallback((position: number) => {
+    if (!audioBuffer) return
+
+    // Stop any current playback
+    stopPlayback()
+
+    // Create or resume audio context
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContext()
+    }
+
+    const ctx = audioContextRef.current
+    if (ctx.state === 'suspended') {
+      ctx.resume()
+    }
+
+    // Create source node
+    const source = ctx.createBufferSource()
+    source.buffer = audioBuffer
+    source.connect(ctx.destination)
+
+    // Handle playback end
+    source.onended = () => {
+      if (sourceNodeRef.current === source) {
+        stopPlayback()
+        setPlaybackPosition(0)
+      }
+    }
+
+    sourceNodeRef.current = source
+    startTimeRef.current = ctx.currentTime
+    startOffsetRef.current = position
+
+    source.start(0, position)
+    setIsPlaying(true)
+    setPlaybackPosition(position)
+    updatePlaybackPosition()
+  }, [audioBuffer, stopPlayback, updatePlaybackPosition])
+
+  const handleSeek = useCallback((normalizedPosition: number) => {
+    if (!audioBuffer) return
+    const position = normalizedPosition * audioBuffer.duration
+    playFromPosition(position)
+  }, [audioBuffer, playFromPosition])
 
   const handleFileSelect = useCallback(async (file: File) => {
+    stopPlayback()
     setIsLoading(true)
     setError(null)
     setMetrics(null)
     setWaveformData([])
+    setAudioBuffer(null)
+    setPlaybackPosition(0)
     setFileName(file.name)
     setProgress({ stage: 'loading', progress: 0 })
 
@@ -25,6 +111,7 @@ function App() {
       setProgress({ stage: 'decoding', progress: 10 })
       // Get waveform data
       const buffer = await loadAudioFile(file)
+      setAudioBuffer(buffer)
       setProgress({ stage: 'decoding', progress: 40 })
       const waveform = getWaveformData(buffer, 200)
       setWaveformData(waveform)
@@ -39,21 +126,27 @@ function App() {
       setIsLoading(false)
       setProgress(null)
     }
-  }, [])
+  }, [stopPlayback])
 
   const handleReset = useCallback(() => {
+    stopPlayback()
     setMetrics(null)
     setWaveformData([])
+    setAudioBuffer(null)
+    setPlaybackPosition(0)
     setFileName('')
     setError(null)
     setProgress(null)
-  }, [])
+  }, [stopPlayback])
 
   const handleLoadExample = useCallback(async () => {
+    stopPlayback()
     setIsLoading(true)
     setError(null)
     setMetrics(null)
     setWaveformData([])
+    setAudioBuffer(null)
+    setPlaybackPosition(0)
     setFileName('Abyss-Duality.mp3')
     setProgress({ stage: 'loading', progress: 0 })
 
@@ -88,6 +181,7 @@ function App() {
       setProgress({ stage: 'decoding', progress: 35 })
       // Get waveform data
       const buffer = await loadAudioFile(file)
+      setAudioBuffer(buffer)
       setProgress({ stage: 'decoding', progress: 50 })
       const waveform = getWaveformData(buffer, 200)
       setWaveformData(waveform)
@@ -102,7 +196,7 @@ function App() {
       setIsLoading(false)
       setProgress(null)
     }
-  }, [])
+  }, [stopPlayback])
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -202,7 +296,12 @@ function App() {
               <MetricsDisplay metrics={metrics} />
 
               {waveformData.length > 0 && (
-                <WaveformDisplay waveformData={waveformData} />
+                <WaveformDisplay
+                  waveformData={waveformData}
+                  onSeek={handleSeek}
+                  playbackPosition={audioBuffer ? playbackPosition / audioBuffer.duration : 0}
+                  isPlaying={isPlaying}
+                />
               )}
 
               {metrics.shortTermLUFS.length > 0 && (
@@ -210,6 +309,9 @@ function App() {
                   values={metrics.shortTermLUFS}
                   times={metrics.shortTermLUFSTimes}
                   integratedLUFS={metrics.integratedLUFS}
+                  onSeek={handleSeek}
+                  playbackPosition={audioBuffer ? playbackPosition / audioBuffer.duration : 0}
+                  isPlaying={isPlaying}
                 />
               )}
             </div>
