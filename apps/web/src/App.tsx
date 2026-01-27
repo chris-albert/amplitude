@@ -19,10 +19,13 @@ function App() {
     setMetrics(null)
     setWaveformData([])
     setFileName(file.name)
+    setProgress({ stage: 'loading', progress: 0 })
 
     try {
+      setProgress({ stage: 'decoding', progress: 10 })
       // Get waveform data
       const buffer = await loadAudioFile(file)
+      setProgress({ stage: 'decoding', progress: 40 })
       const waveform = getWaveformData(buffer, 200)
       setWaveformData(waveform)
 
@@ -52,14 +55,40 @@ function App() {
     setMetrics(null)
     setWaveformData([])
     setFileName('Abyss-Duality.mp3')
+    setProgress({ stage: 'loading', progress: 0 })
 
     try {
       const response = await fetch(import.meta.env.BASE_URL + 'Abyss-Duality.mp3')
-      const blob = await response.blob()
-      const file = new File([blob], 'Abyss-Duality.mp3', { type: 'audio/mpeg' })
 
+      // Track download progress if possible
+      const contentLength = response.headers.get('content-length')
+      let file: File
+      if (contentLength && response.body) {
+        const total = parseInt(contentLength, 10)
+        let loaded = 0
+        const reader = response.body.getReader()
+        const chunks: Uint8Array[] = []
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          chunks.push(value)
+          loaded += value.length
+          setProgress({ stage: 'loading', progress: Math.round((loaded / total) * 30) })
+        }
+
+        const blob = new Blob(chunks as BlobPart[], { type: 'audio/mpeg' })
+        file = new File([blob], 'Abyss-Duality.mp3', { type: 'audio/mpeg' })
+      } else {
+        setProgress({ stage: 'loading', progress: 15 })
+        const blob = await response.blob()
+        file = new File([blob], 'Abyss-Duality.mp3', { type: 'audio/mpeg' })
+      }
+
+      setProgress({ stage: 'decoding', progress: 35 })
       // Get waveform data
       const buffer = await loadAudioFile(file)
+      setProgress({ stage: 'decoding', progress: 50 })
       const waveform = getWaveformData(buffer, 200)
       setWaveformData(waveform)
 
@@ -131,22 +160,29 @@ function App() {
             </div>
           )}
 
-          {isLoading && progress && (
+          {isLoading && (
             <div className="max-w-md mx-auto text-center">
               <div className="card">
                 <div className="flex items-center justify-center gap-3 mb-4">
                   <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
                   <span className="text-gray-300 font-medium">
-                    {progress.stage === 'decoding' ? 'Decoding audio...' : 'Analyzing loudness...'}
+                    {!progress || progress.stage === 'loading'
+                      ? 'Loading file...'
+                      : progress.stage === 'decoding'
+                        ? 'Decoding audio...'
+                        : 'Analyzing loudness...'}
                   </span>
                 </div>
                 <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-300"
-                    style={{ width: `${progress.progress}%` }}
+                    style={{ width: `${progress?.progress ?? 0}%` }}
                   />
                 </div>
-                <p className="mt-3 text-sm text-gray-500">{fileName}</p>
+                <div className="mt-3 flex items-center justify-between text-sm">
+                  <span className="text-gray-500">{fileName}</span>
+                  <span className="text-purple-400 font-medium">{progress?.progress ?? 0}%</span>
+                </div>
               </div>
             </div>
           )}
