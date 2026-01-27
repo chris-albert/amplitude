@@ -299,6 +299,7 @@ function App() {
                 <WaveformDisplay
                   waveformData={waveformData}
                   onSeek={handleSeek}
+                  onStop={stopPlayback}
                   playbackPosition={audioBuffer ? playbackPosition / audioBuffer.duration : 0}
                   isPlaying={isPlaying}
                 />
@@ -310,6 +311,7 @@ function App() {
                   times={metrics.shortTermLUFSTimes}
                   integratedLUFS={metrics.integratedLUFS}
                   onSeek={handleSeek}
+                  onStop={stopPlayback}
                   playbackPosition={audioBuffer ? playbackPosition / audioBuffer.duration : 0}
                   isPlaying={isPlaying}
                 />
