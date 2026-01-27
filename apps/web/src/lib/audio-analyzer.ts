@@ -14,6 +14,10 @@ export interface AudioMetrics {
   maxLUFSPosition: number
   peakDBPosition: number
   minDBPosition: number
+  // Time-series dB data
+  peakDBOverTime: number[]
+  rmsDBOverTime: number[]
+  dbTimes: number[]
 }
 
 export interface AnalysisProgress {
@@ -187,6 +191,58 @@ export async function calculateShortTermLUFS(
   return { values, times }
 }
 
+// Calculate dB over time (peak and RMS)
+export async function calculateDBOverTime(
+  buffer: AudioBuffer
+): Promise<{ peakDB: number[], rmsDB: number[], times: number[] }> {
+  const windowSize = Math.floor(0.1 * buffer.sampleRate) // 100ms windows
+  const hopSize = Math.floor(0.05 * buffer.sampleRate) // 50ms hop (50% overlap)
+  const length = buffer.length
+
+  const peakDB: number[] = []
+  const rmsDB: number[] = []
+  const times: number[] = []
+  let iterCount = 0
+
+  // Mix all channels to mono for analysis
+  const monoData = new Float32Array(length)
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const channelData = buffer.getChannelData(ch)
+    for (let i = 0; i < length; i++) {
+      monoData[i] += channelData[i] / buffer.numberOfChannels
+    }
+  }
+
+  for (let start = 0; start + windowSize <= length; start += hopSize) {
+    let maxSample = 0
+    let sumSquares = 0
+
+    for (let i = start; i < start + windowSize; i++) {
+      const absValue = Math.abs(monoData[i])
+      if (absValue > maxSample) maxSample = absValue
+      sumSquares += monoData[i] * monoData[i]
+    }
+
+    // Peak dB for this window
+    const peak = maxSample > 0 ? 20 * Math.log10(maxSample) : -96
+    peakDB.push(Math.max(peak, -96)) // Floor at -96 dB
+
+    // RMS dB for this window
+    const rms = Math.sqrt(sumSquares / windowSize)
+    const rmsVal = rms > 0 ? 20 * Math.log10(rms) : -96
+    rmsDB.push(Math.max(rmsVal, -96)) // Floor at -96 dB
+
+    times.push((start + windowSize / 2) / buffer.sampleRate)
+
+    // Yield every 500 iterations to keep UI responsive
+    if (++iterCount % 500 === 0) {
+      await yieldToMain()
+    }
+  }
+
+  return { peakDB, rmsDB, times }
+}
+
 // Calculate dB metrics from raw audio buffer (memory-efficient streaming approach)
 export async function calculateDBMetrics(buffer: AudioBuffer): Promise<{
   peakDB: number
@@ -296,10 +352,15 @@ export async function analyzeAudio(
   // Calculate short-term LUFS
   const shortTerm = await calculateShortTermLUFS(filteredChannels, buffer.sampleRate)
 
-  onProgress?.({ stage: 'analyzing', progress: 90 })
+  onProgress?.({ stage: 'analyzing', progress: 85 })
 
   // Calculate dB metrics
   const dbMetrics = await calculateDBMetrics(buffer)
+
+  onProgress?.({ stage: 'analyzing', progress: 92 })
+
+  // Calculate dB over time
+  const dbOverTime = await calculateDBOverTime(buffer)
 
   onProgress?.({ stage: 'analyzing', progress: 100 })
   onProgress?.({ stage: 'complete', progress: 100 })
@@ -343,6 +404,9 @@ export async function analyzeAudio(
     maxLUFSPosition,
     peakDBPosition: dbMetrics.peakDBPosition,
     minDBPosition: dbMetrics.minDBPosition,
+    peakDBOverTime: dbOverTime.peakDB,
+    rmsDBOverTime: dbOverTime.rmsDB,
+    dbTimes: dbOverTime.times,
   }
 }
 

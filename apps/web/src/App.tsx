@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useMemo } from 'react'
 import { FileUploader } from './components/FileUploader'
 import { WaveformDisplay, type Marker } from './components/WaveformDisplay'
 import { LoudnessChart } from './components/LoudnessChart'
+import { DBChart } from './components/DBChart'
 import { MetricsDisplay } from './components/MetricsDisplay'
 import { analyzeAudio, loadAudioFile, getWaveformData, type AudioMetrics, type AnalysisProgress } from './lib/audio-analyzer'
 
@@ -327,6 +328,21 @@ function App() {
                   values={metrics.shortTermLUFS}
                   times={metrics.shortTermLUFSTimes}
                   integratedLUFS={metrics.integratedLUFS}
+                  onSeek={handleSeek}
+                  onPlay={handlePlay}
+                  onStop={stopPlayback}
+                  playbackPosition={audioBuffer ? playbackPosition / audioBuffer.duration : 0}
+                  isPlaying={isPlaying}
+                  markers={markers}
+                />
+              )}
+
+              {metrics.peakDBOverTime.length > 0 && (
+                <DBChart
+                  peakDBValues={metrics.peakDBOverTime}
+                  rmsDBValues={metrics.rmsDBOverTime}
+                  times={metrics.dbTimes}
+                  averageDB={metrics.averageDB}
                   onSeek={handleSeek}
                   onPlay={handlePlay}
                   onStop={stopPlayback}
