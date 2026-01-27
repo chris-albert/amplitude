@@ -29,9 +29,14 @@ interface LoudnessChartProps {
   integratedLUFS: number
   className?: string
   onSeek?: (normalizedPosition: number) => void
+  onPlay?: () => void
+  onStop?: () => void
   playbackPosition?: number
   isPlaying?: boolean
 }
+
+// Fixed width to match waveform alignment
+const Y_AXIS_WIDTH = 70
 
 export function LoudnessChart({
   values,
@@ -39,6 +44,8 @@ export function LoudnessChart({
   integratedLUFS,
   className = '',
   onSeek,
+  onPlay,
+  onStop,
   playbackPosition = 0,
   isPlaying = false
 }: LoudnessChartProps) {
@@ -150,14 +157,17 @@ export function LoudnessChart({
       },
       y: {
         display: true,
-        min: Math.min(...displayValues, integratedLUFS) - 5,
-        max: Math.max(...displayValues, integratedLUFS) + 5,
+        min: Math.floor((Math.min(...displayValues, integratedLUFS) - 5) * 10) / 10,
+        max: Math.ceil((Math.max(...displayValues, integratedLUFS) + 5) * 10) / 10,
         grid: {
           color: 'rgba(255, 255, 255, 0.05)',
         },
         ticks: {
           color: 'rgba(255, 255, 255, 0.5)',
-          callback: (value: any) => `${value} LUFS`,
+          callback: (value: any) => `${Number(value).toFixed(1)} LUFS`,
+        },
+        afterFit: (scale: any) => {
+          scale.width = Y_AXIS_WIDTH
         },
       },
     },
@@ -181,7 +191,26 @@ export function LoudnessChart({
 
   return (
     <div className={`card ${className}`}>
-      <h3 className="text-sm font-medium text-gray-400 mb-4">Loudness Over Time</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-medium text-gray-400">Loudness Over Time</h3>
+        {(onPlay || onStop) && (
+          <button
+            onClick={isPlaying ? onStop : onPlay}
+            className="p-1.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+            title={isPlaying ? "Stop playback" : "Play from beginning"}
+          >
+            {isPlaying ? (
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="6" width="12" height="12" rx="1" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            )}
+          </button>
+        )}
+      </div>
       <div
         className={`h-64 relative ${onSeek ? 'cursor-pointer' : ''}`}
         onClick={handleChartClick}

@@ -96,6 +96,10 @@ function App() {
     playFromPosition(position)
   }, [audioBuffer, playFromPosition])
 
+  const handlePlay = useCallback(() => {
+    playFromPosition(0)
+  }, [playFromPosition])
+
   const handleFileSelect = useCallback(async (file: File) => {
     stopPlayback()
     setIsLoading(true)
@@ -299,6 +303,8 @@ function App() {
                 <WaveformDisplay
                   waveformData={waveformData}
                   onSeek={handleSeek}
+                  onPlay={handlePlay}
+                  onStop={stopPlayback}
                   playbackPosition={audioBuffer ? playbackPosition / audioBuffer.duration : 0}
                   isPlaying={isPlaying}
                 />
@@ -310,6 +316,8 @@ function App() {
                   times={metrics.shortTermLUFSTimes}
                   integratedLUFS={metrics.integratedLUFS}
                   onSeek={handleSeek}
+                  onPlay={handlePlay}
+                  onStop={stopPlayback}
                   playbackPosition={audioBuffer ? playbackPosition / audioBuffer.duration : 0}
                   isPlaying={isPlaying}
                 />

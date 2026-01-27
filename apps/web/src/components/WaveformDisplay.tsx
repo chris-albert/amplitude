@@ -4,14 +4,21 @@ interface WaveformDisplayProps {
   waveformData: number[]
   className?: string
   onSeek?: (normalizedPosition: number) => void
+  onPlay?: () => void
+  onStop?: () => void
   playbackPosition?: number
   isPlaying?: boolean
 }
+
+// Fixed width to match Chart.js Y-axis
+const Y_AXIS_WIDTH = 70
 
 export function WaveformDisplay({
   waveformData,
   className = '',
   onSeek,
+  onPlay,
+  onStop,
   playbackPosition = 0,
   isPlaying = false
 }: WaveformDisplayProps) {
@@ -95,11 +102,31 @@ export function WaveformDisplay({
 
   return (
     <div className={`card ${className}`}>
-      <h3 className="text-sm font-medium text-gray-400 mb-4">Waveform</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-medium text-gray-400">Waveform</h3>
+        {(onPlay || onStop) && (
+          <button
+            onClick={isPlaying ? onStop : onPlay}
+            className="p-1.5 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+            title={isPlaying ? "Stop playback" : "Play from beginning"}
+          >
+            {isPlaying ? (
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <rect x="6" y="6" width="12" height="12" rx="1" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            )}
+          </button>
+        )}
+      </div>
       <div
         ref={containerRef}
         onClick={handleClick}
         className={`relative ${onSeek ? 'cursor-pointer' : ''}`}
+        style={{ marginLeft: `${Y_AXIS_WIDTH}px` }}
       >
         <canvas
           ref={canvasRef}
