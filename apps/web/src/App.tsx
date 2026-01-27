@@ -1,0 +1,150 @@
+import { useState, useCallback } from 'react'
+import { FileUploader } from './components/FileUploader'
+import { WaveformDisplay } from './components/WaveformDisplay'
+import { LoudnessChart } from './components/LoudnessChart'
+import { MetricsDisplay } from './components/MetricsDisplay'
+import { analyzeAudio, loadAudioFile, getWaveformData, type AudioMetrics, type AnalysisProgress } from './lib/audio-analyzer'
+
+function App() {
+  const [isLoading, setIsLoading] = useState(false)
+  const [progress, setProgress] = useState<AnalysisProgress | null>(null)
+  const [metrics, setMetrics] = useState<AudioMetrics | null>(null)
+  const [waveformData, setWaveformData] = useState<number[]>([])
+  const [fileName, setFileName] = useState<string>('')
+  const [error, setError] = useState<string | null>(null)
+
+  const handleFileSelect = useCallback(async (file: File) => {
+    setIsLoading(true)
+    setError(null)
+    setMetrics(null)
+    setWaveformData([])
+    setFileName(file.name)
+
+    try {
+      // Get waveform data
+      const buffer = await loadAudioFile(file)
+      const waveform = getWaveformData(buffer, 200)
+      setWaveformData(waveform)
+
+      // Analyze audio
+      const results = await analyzeAudio(file, setProgress)
+      setMetrics(results)
+    } catch (err) {
+      console.error('Analysis error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to analyze audio file')
+    } finally {
+      setIsLoading(false)
+      setProgress(null)
+    }
+  }, [])
+
+  const handleReset = useCallback(() => {
+    setMetrics(null)
+    setWaveformData([])
+    setFileName('')
+    setError(null)
+    setProgress(null)
+  }, [])
+
+  return (
+    <div className="min-h-screen bg-gray-950">
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-transparent to-blue-900/20 pointer-events-none" />
+
+      <header className="relative border-b border-gray-800/50">
+        <div className="max-w-6xl mx-auto px-4 py-4">
+          <a href="#" onClick={(e) => { e.preventDefault(); handleReset(); }} className="flex items-center gap-3 group">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold gradient-text">Amplitude</h1>
+              <p className="text-xs text-gray-500">Audio Loudness Analyzer</p>
+            </div>
+          </a>
+        </div>
+      </header>
+
+      <main className="relative">
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          {!metrics && !isLoading && (
+            <div className="max-w-2xl mx-auto">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-white mb-2">
+                  Analyze Your Audio
+                </h2>
+                <p className="text-gray-400">
+                  Get detailed loudness metrics including LUFS, peak levels, and dynamic range
+                </p>
+              </div>
+              <FileUploader onFileSelect={handleFileSelect} isLoading={isLoading} />
+              {error && (
+                <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                  {error}
+                </div>
+              )}
+            </div>
+          )}
+
+          {isLoading && progress && (
+            <div className="max-w-md mx-auto text-center">
+              <div className="card">
+                <div className="flex items-center justify-center gap-3 mb-4">
+                  <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-gray-300 font-medium">
+                    {progress.stage === 'decoding' ? 'Decoding audio...' : 'Analyzing loudness...'}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-300"
+                    style={{ width: `${progress.progress}%` }}
+                  />
+                </div>
+                <p className="mt-3 text-sm text-gray-500">{fileName}</p>
+              </div>
+            </div>
+          )}
+
+          {metrics && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">{fileName}</h2>
+                  <p className="text-gray-500 text-sm">Analysis complete</p>
+                </div>
+                <button onClick={handleReset} className="btn-primary">
+                  Analyze Another
+                </button>
+              </div>
+
+              <MetricsDisplay metrics={metrics} />
+
+              {waveformData.length > 0 && (
+                <WaveformDisplay waveformData={waveformData} />
+              )}
+
+              {metrics.shortTermLUFS.length > 0 && (
+                <LoudnessChart
+                  values={metrics.shortTermLUFS}
+                  times={metrics.shortTermLUFSTimes}
+                  integratedLUFS={metrics.integratedLUFS}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      </main>
+
+      <footer className="relative border-t border-gray-800/50 mt-auto">
+        <div className="max-w-6xl mx-auto px-4 py-6 text-center text-sm text-gray-600">
+          <p>Analyze audio loudness with LUFS (ITU-R BS.1770) measurements</p>
+          <p className="mt-1">All processing happens locally in your browser</p>
+        </div>
+      </footer>
+    </div>
+  )
+}
+
+export default App
