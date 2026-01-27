@@ -12,7 +12,7 @@ export interface AudioMetrics {
 }
 
 export interface AnalysisProgress {
-  stage: 'decoding' | 'analyzing' | 'complete'
+  stage: 'loading' | 'decoding' | 'analyzing' | 'complete'
   progress: number
 }
 
@@ -217,27 +217,26 @@ export async function analyzeAudio(
   file: File,
   onProgress?: ProgressCallback
 ): Promise<AudioMetrics> {
-  onProgress?.({ stage: 'decoding', progress: 0 })
+  onProgress?.({ stage: 'decoding', progress: 50 })
 
   const buffer = await loadAudioFile(file)
 
-  onProgress?.({ stage: 'decoding', progress: 100 })
-  onProgress?.({ stage: 'analyzing', progress: 0 })
+  onProgress?.({ stage: 'analyzing', progress: 60 })
 
   // Apply K-weighting filter
   const filteredChannels = await applyKWeighting(buffer)
 
-  onProgress?.({ stage: 'analyzing', progress: 30 })
+  onProgress?.({ stage: 'analyzing', progress: 70 })
 
   // Calculate integrated LUFS
   const integratedLUFS = calculateIntegratedLUFS(filteredChannels, buffer.sampleRate)
 
-  onProgress?.({ stage: 'analyzing', progress: 50 })
+  onProgress?.({ stage: 'analyzing', progress: 80 })
 
   // Calculate short-term LUFS
   const shortTerm = calculateShortTermLUFS(filteredChannels, buffer.sampleRate)
 
-  onProgress?.({ stage: 'analyzing', progress: 70 })
+  onProgress?.({ stage: 'analyzing', progress: 90 })
 
   // Calculate dB metrics
   const dbMetrics = calculateDBMetrics(buffer)
