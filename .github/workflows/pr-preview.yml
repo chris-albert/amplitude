@@ -34,13 +34,24 @@ jobs:
         env:
           VITE_BASE_PATH: /amplitude/pr-${{ github.event.pull_request.number }}/
 
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages-branch
+
+      - name: Clear old PR preview files
+        run: |
+          rm -rf gh-pages-branch/pr-${{ github.event.pull_request.number }}
+          mkdir -p gh-pages-branch/pr-${{ github.event.pull_request.number }}
+          cp -r ./apps/web/dist/* gh-pages-branch/pr-${{ github.event.pull_request.number }}/
+
       - name: Deploy to GitHub Pages (PR subdirectory)
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./apps/web/dist
-          destination_dir: pr-${{ github.event.pull_request.number }}
-          keep_files: true
+          publish_dir: ./gh-pages-branch
+          keep_files: false
 
       - name: Comment PR with preview link
         uses: actions/github-script@v7
