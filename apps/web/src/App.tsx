@@ -46,6 +46,35 @@ function App() {
     setProgress(null)
   }, [])
 
+  const handleLoadExample = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    setMetrics(null)
+    setWaveformData([])
+    setFileName('Abyss-Duality.mp3')
+
+    try {
+      const response = await fetch(import.meta.env.BASE_URL + 'Abyss-Duality.mp3')
+      const blob = await response.blob()
+      const file = new File([blob], 'Abyss-Duality.mp3', { type: 'audio/mpeg' })
+
+      // Get waveform data
+      const buffer = await loadAudioFile(file)
+      const waveform = getWaveformData(buffer, 200)
+      setWaveformData(waveform)
+
+      // Analyze audio
+      const results = await analyzeAudio(file, setProgress)
+      setMetrics(results)
+    } catch (err) {
+      console.error('Analysis error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load example file')
+    } finally {
+      setIsLoading(false)
+      setProgress(null)
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-gray-950">
       <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-transparent to-blue-900/20 pointer-events-none" />
@@ -79,6 +108,21 @@ function App() {
                 </p>
               </div>
               <FileUploader onFileSelect={handleFileSelect} isLoading={isLoading} />
+              <div className="mt-6 text-center">
+                <p className="text-gray-500 text-sm mb-3">or</p>
+                <button
+                  onClick={handleLoadExample}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-purple-400
+                             bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30
+                             rounded-lg transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Try Example: Abyss-Duality.mp3
+                </button>
+              </div>
               {error && (
                 <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
                   {error}
