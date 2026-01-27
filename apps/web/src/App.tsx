@@ -217,6 +217,8 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-950">
       <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-transparent to-blue-900/20 pointer-events-none" />
+      <div className="grid-pattern" />
+      <div className="noise-texture" />
 
       <header className="relative border-b border-gray-800/50">
         <div className="max-w-6xl mx-auto px-4 py-4">
