@@ -26,19 +26,15 @@ body {
   }
 }
 
-/* Subtle grid pattern overlay */
+/* Corner brackets pattern overlay (squares with middles missing) */
 .grid-pattern {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.025;
-  background-image:
-    linear-gradient(rgba(139, 92, 246, 0.3) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(139, 92, 246, 0.3) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
-  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
+  opacity: 0.08;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0 L0 15 M0 0 L15 0' stroke='%238b5cf6' fill='none' stroke-width='1'/%3E%3Cpath d='M60 0 L60 15 M60 0 L45 0' stroke='%238b5cf6' fill='none' stroke-width='1'/%3E%3Cpath d='M0 60 L0 45 M0 60 L15 60' stroke='%238b5cf6' fill='none' stroke-width='1'/%3E%3Cpath d='M60 60 L60 45 M60 60 L45 60' stroke='%238b5cf6' fill='none' stroke-width='1'/%3E%3C/svg%3E");
+  background-size: 60px 60px;
 }
 
 /* Subtle noise texture overlay */
