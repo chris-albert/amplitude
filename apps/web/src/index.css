@@ -32,9 +32,9 @@ body {
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.15;
-  background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M50 5 Q75 25 50 45 Q25 65 50 85 Q75 105 50 125' stroke='%238b5cf6' fill='none' stroke-width='1'/%3E%3Cpath d='M25 -5 Q50 15 25 35 Q0 55 25 75 Q50 95 25 115' stroke='%237c3aed' fill='none' stroke-width='1'/%3E%3Cpath d='M75 -5 Q100 15 75 35 Q50 55 75 75 Q100 95 75 115' stroke='%236366f1' fill='none' stroke-width='1'/%3E%3Ccircle cx='50' cy='50' r='40' stroke='%238b5cf6' fill='none' stroke-width='0.75' opacity='0.6'/%3E%3Ccircle cx='50' cy='50' r='28' stroke='%237c3aed' fill='none' stroke-width='0.75' opacity='0.7'/%3E%3Ccircle cx='50' cy='50' r='16' stroke='%236366f1' fill='none' stroke-width='0.75' opacity='0.8'/%3E%3Ccircle cx='50' cy='50' r='6' stroke='%238b5cf6' fill='none' stroke-width='1'/%3E%3C/svg%3E");
-  background-size: 150px 150px;
+  opacity: 0.18;
+  background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M100 20 C140 20 170 50 175 90 C180 130 160 170 120 180 C80 190 40 170 25 130 C10 90 30 50 60 30 C75 20 90 20 100 20' stroke='%238b5cf6' fill='none' stroke-width='1'/%3E%3Cpath d='M100 40 C130 42 150 60 155 90 C160 120 145 150 115 160 C85 170 55 155 42 125 C30 95 45 60 70 48 C82 42 92 40 100 40' stroke='%237c3aed' fill='none' stroke-width='1'/%3E%3Cpath d='M100 60 C120 62 135 75 138 95 C142 115 130 135 110 142 C90 150 68 140 58 118 C48 96 58 72 78 64 C88 60 95 60 100 60' stroke='%236366f1' fill='none' stroke-width='1'/%3E%3Cpath d='M100 80 C112 81 122 88 124 100 C126 112 118 124 106 128 C94 132 80 126 74 114 C68 102 74 88 86 83 C92 80 97 80 100 80' stroke='%238b5cf6' fill='none' stroke-width='1'/%3E%3Cpath d='M15 15 C35 10 55 25 50 45 C45 65 20 70 10 55 C0 40 5 20 15 15' stroke='%236366f1' fill='none' stroke-width='0.75' opacity='0.7'/%3E%3Cpath d='M175 160 C190 155 200 170 195 185 C190 200 170 205 158 195 C146 185 155 165 175 160' stroke='%237c3aed' fill='none' stroke-width='0.75' opacity='0.7'/%3E%3C/svg%3E");
+  background-size: 300px 300px;
   mask-image: radial-gradient(ellipse 90% 90% at 50% 50%, black 50%, transparent 100%);
   -webkit-mask-image: radial-gradient(ellipse 90% 90% at 50% 50%, black 50%, transparent 100%);
 }
