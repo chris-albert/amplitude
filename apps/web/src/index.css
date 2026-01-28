@@ -26,17 +26,15 @@ body {
   }
 }
 
-/* Subtle grid pattern overlay */
+/* Subtle topographic pattern overlay */
 .grid-pattern {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.025;
-  background-image:
-    linear-gradient(rgba(139, 92, 246, 0.3) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(139, 92, 246, 0.3) 1px, transparent 1px);
-  background-size: 64px 64px;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M50 10 Q70 25 50 40 Q30 55 50 70 Q70 85 50 100' stroke='rgba(139,92,246,0.4)' fill='none' stroke-width='0.5'/%3E%3Cpath d='M30 0 Q50 15 30 30 Q10 45 30 60 Q50 75 30 90' stroke='rgba(139,92,246,0.3)' fill='none' stroke-width='0.5'/%3E%3Cpath d='M70 0 Q90 15 70 30 Q50 45 70 60 Q90 75 70 90' stroke='rgba(139,92,246,0.3)' fill='none' stroke-width='0.5'/%3E%3Cpath d='M10 10 Q30 25 10 40 Q-10 55 10 70 Q30 85 10 100' stroke='rgba(59,130,246,0.3)' fill='none' stroke-width='0.5'/%3E%3Cpath d='M90 10 Q110 25 90 40 Q70 55 90 70 Q110 85 90 100' stroke='rgba(59,130,246,0.3)' fill='none' stroke-width='0.5'/%3E%3Ccircle cx='50' cy='50' r='35' stroke='rgba(139,92,246,0.2)' fill='none' stroke-width='0.5'/%3E%3Ccircle cx='50' cy='50' r='25' stroke='rgba(139,92,246,0.25)' fill='none' stroke-width='0.5'/%3E%3Ccircle cx='50' cy='50' r='15' stroke='rgba(139,92,246,0.3)' fill='none' stroke-width='0.5'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
   mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
   -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
 }
